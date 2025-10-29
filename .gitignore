@@ -1,0 +1,45 @@
+# Environment variables with secrets
+.env
+env
+
+# MollyFlix data directory - contains all media and config
+MollyFlix/
+
+# Service-specific directories
+Prowlarr/
+Sonarr/
+Radarr/
+Lidarr/
+Homarr/
+Jellyfin/
+qbittorrent/
+Caddy/
+
+# Downloads directory
+Downloads/
+
+# Media files
+*.mp4
+*.mkv
+*.avi
+*.mov
+*.flv
+*.wmv
+*.m4v
+*.mp3
+*.flac
+*.wav
+*.aac
+*.ogg
+
+# Docker volumes
+docker-compose.override.yml
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
