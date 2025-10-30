@@ -187,12 +187,48 @@ services:
 # ╚██████╗███████╗╚██████╔╝╚██████╔╝██████╔╝██║     ███████╗██║  ██║██║  ██║███████╗
 #  ╚═════╝╚══════╝ ╚═════╝  ╚═════╝ ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝
 
-  cloudflared:
-    container_name: cloudflared
-    hostname: cloudflared
+  cloudflared-jellyfin:
+    container_name: cloudflared-jellyfin
+    hostname: cloudflared-jellyfin
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
-    command: tunnel --no-autoupdate --protocol http2 run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate --protocol http2 run --token ${CLOUDFLARE_TUNNEL_TOKEN_JELLYFIN}
+    env_file:
+      - '.env'
+
+  cloudflared-qbittorrent:
+    container_name: cloudflared-qbittorrent
+    hostname: cloudflared-qbittorrent
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --protocol http2 run --token ${CLOUDFLARE_TUNNEL_TOKEN_QBITTORRENT}
+    env_file:
+      - '.env'
+
+  cloudflared-prowlarr:
+    container_name: cloudflared-prowlarr
+    hostname: cloudflared-prowlarr
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --protocol http2 run --token ${CLOUDFLARE_TUNNEL_TOKEN_PROWLARR}
+    env_file:
+      - '.env'
+
+  cloudflared-radarr:
+    container_name: cloudflared-radarr
+    hostname: cloudflared-radarr
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --protocol http2 run --token ${CLOUDFLARE_TUNNEL_TOKEN_RADARR}
+    env_file:
+      - '.env'
+
+  cloudflared-sonarr:
+    container_name: cloudflared-sonarr
+    hostname: cloudflared-sonarr
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --protocol http2 run --token ${CLOUDFLARE_TUNNEL_TOKEN_SONARR}
     env_file:
       - '.env'
 
