@@ -136,20 +136,42 @@ services:
 # ╚██████╔╝██████╔╝██║   ██║      ██║   ╚██████╔╝██║  ██║██║  ██║███████╗██║ ╚████║   ██║   
 #  ╚══▀▀═╝ ╚═════╝ ╚═╝   ╚═╝      ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═══╝   ╚═╝                                                                                          
                                                                                              
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    hostname: gluetun
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - VPN_SERVICE_PROVIDER=${OPENVPN_PROVIDER}
+      - OPENVPN_USER=${OPENVPN_USERNAME}
+      - OPENVPN_PASSWORD=${OPENVPN_PASSWORD}
+      - SERVER_COUNTRIES=${SERVER_COUNTRIES}
+      - TZ=${TZ}
+    ports:
+      - 8080:8080 # qBittorrent Web UI
+      - 6881:6881 # qBittorrent torrent port TCP
+      - 6881:6881/udp # qBittorrent torrent port UDP
+    volumes:
+      - ${ARRPATH}gluetun:/gluetun
+    env_file:
+      - '.env'
+
   qbittorrent:
     image: linuxserver/qbittorrent:latest
     container_name: qbittorrent
-    hostname: qbittorrent
     restart: unless-stopped
+    network_mode: service:gluetun
+    depends_on:
+      - gluetun
     labels:
       - "com.centurylinklabs.watchtower.enable=false"
     volumes:
       - ${ARRPATH}qbittorrent/config:/config
       - ${ARRPATH}Downloads:/downloads
-    ports:
-      - 8080:8080
-      - 6881:6881
-      - 6881:6881/udp
     environment:
       - WEBUI_PORT=8080
       - TORRENTING_PORT=6881
@@ -158,57 +180,19 @@ services:
     env_file:
       - '.env'
 
-#  ██████╗ █████╗ ██████╗ ██████╗ ██╗   ██╗
-# ██╔════╝██╔══██╗██╔══██╗██╔══██╗╚██╗ ██╔╝
-# ██║     ███████║██║  ██║██║  ██║ ╚████╔╝ 
-# ██║     ██╔══██║██║  ██║██║  ██║  ╚██╔╝  
-# ╚██████╗██║  ██║██████╔╝██████╔╝   ██║   
-#  ╚═════╝╚═╝  ╚═╝╚═════╝ ╚═════╝    ╚═╝   
+#  ██████╗██╗      ██████╗ ██╗   ██╗██████╗ ███████╗██╗      █████╗ ██████╗ ███████╗
+# ██╔════╝██║     ██╔═══██╗██║   ██║██╔══██╗██╔════╝██║     ██╔══██╗██╔══██╗██╔════╝
+# ██║     ██║     ██║   ██║██║   ██║██║  ██║█████╗  ██║     ███████║██████╔╝█████╗  
+# ██║     ██║     ██║   ██║██║   ██║██║  ██║██╔══╝  ██║     ██╔══██║██╔══██╗██╔══╝  
+# ╚██████╗███████╗╚██████╔╝╚██████╔╝██████╔╝██║     ███████╗██║  ██║██║  ██║███████╗
+#  ╚═════╝╚══════╝ ╚═════╝  ╚═════╝ ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝
 
-  caddy:
-    container_name: caddy
-    hostname: caddy
+  cloudflared:
+    container_name: cloudflared
+    hostname: cloudflared
+    image: cloudflare/cloudflared:latest
     restart: unless-stopped
-    build:
-      context: .
-      dockerfile_inline: |
-        FROM caddy:builder AS builder
-        RUN xcaddy build \
-            --with github.com/caddy-dns/cloudflare \
-            --with github.com/mholt/caddy-dynamicdns
-        FROM caddy:latest
-        COPY --from=builder /usr/bin/caddy /usr/bin/caddy
-    command:
-      - sh
-      - -c
-      - |
-        cat > /etc/caddy/Caddyfile <<'CADDYEOF'
-        {
-            dynamic_dns {
-                provider cloudflare {env.CLOUDFLARE_API_TOKEN}
-                domains {
-                    {env.DOMAIN}
-                }
-            }
-        }
-        {env.DOMAIN} {
-            tls {
-                dns cloudflare {env.CLOUDFLARE_API_TOKEN}
-            }
-            reverse_proxy jellyfin:8096
-        }
-        CADDYEOF
-        caddy run --config /etc/caddy/Caddyfile
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ${ARRPATH}Caddy/data:/data
-      - ${ARRPATH}Caddy/config:/config
-    environment:
-      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
-      - DOMAIN=${DOMAIN}
+    command: tunnel --no-autoupdate --protocol http2 run --token ${CLOUDFLARE_TUNNEL_TOKEN}
     env_file:
       - '.env'
 

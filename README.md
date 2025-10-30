@@ -1,22 +1,23 @@
 # MollyFlix Media Server Stack
 
-A fully automated media server stack using Docker Compose with Prowlarr, Sonarr, Radarr, Lidarr, Jellyfin, qBittorrent, Homarr dashboard, and Caddy reverse proxy with automatic HTTPS.
+A fully automated media server stack using Docker Compose with Prowlarr, Sonarr, Radarr, Lidarr, Jellyfin, qBittorrent (with VPN), Homarr dashboard, and Cloudflare Tunnel for secure external access.
 
 **Forked from:** [automation-avenue/youtube-39-arr-apps-1-click](https://github.com/automation-avenue/youtube-39-arr-apps-1-click)
 
 ## Features
-- **Automatic HTTPS** via Caddy with Cloudflare DNS integration
-- **Dynamic DNS** support for domain management
+- **Secure External Access** via Cloudflare Tunnel (bypasses ISP port blocking)
+- **VPN-Routed Downloads** with Gluetun + Surfshark for qBittorrent privacy
 - **Complete media automation** with *arr apps
 - **Unified dashboard** with Homarr
-- **Secure reverse proxy** with environment-based configuration
+- **No port forwarding required** for external access
 
 ## Quick Start
 
 ### Prerequisites
 - Docker and Docker Compose installed
-- Cloudflare account with API token (for HTTPS/DNS)
-- Domain name pointing to your server
+- Cloudflare account with Zero Trust access
+- Domain name managed by Cloudflare
+- Surfshark VPN subscription (for qBittorrent VPN)
 
 ### Installation
 
@@ -29,21 +30,23 @@ cd mollyflix
 2. Create and configure `.env` file:
 ```env
 ARRPATH=./MollyFlix/
-CLOUDFLARE_API_TOKEN=your_cloudflare_api_token
-DOMAIN=your.domain.com
 PUID=1000
 PGID=1000
 TZ=Asia/Singapore
+
+# Cloudflare Tunnel Token (get from Cloudflare Zero Trust dashboard)
+CLOUDFLARE_TUNNEL_TOKEN=your_tunnel_token_here
+
+# Surfshark VPN Credentials (get from Surfshark dashboard → VPN → Manual Setup → OpenVPN)
+OPENVPN_PROVIDER=surfshark
+OPENVPN_USERNAME=your_surfshark_username
+OPENVPN_PASSWORD=your_surfshark_password
+SERVER_COUNTRIES=Singapore
 ```
 
 3. Start the stack:
 ```bash
 docker-compose up -d
-```
-
-4. Monitor the build (first time takes longer due to Caddy custom build):
-```bash
-docker-compose logs -f caddy
 ```
 
 ### Windows Note
@@ -153,7 +156,7 @@ Unified dashboard for all services. Add widgets for quick access to:
 - Jellyfin
 
 ### Jellyfin (Media Server)
-**Access:** `http://localhost:8096` or `https://your.domain.com`
+**Access:** `http://localhost:8096` or `https://jellyfin.yourdomain.com` (via Cloudflare Tunnel)
 
 **Note:** If port 1900 is already in use (commonly by `rygel` service on Linux):
 ```bash
@@ -178,14 +181,35 @@ volumes:
 ```
 Always use the path on the **right side** of the colon (e.g., `/data/Movies`)
 
-### Caddy (Reverse Proxy)
-Automatically configured with:
-- HTTPS certificates via Let's Encrypt
-- Cloudflare DNS challenge
-- Dynamic DNS updates
-- Reverse proxy to Jellyfin at your domain
+### Cloudflare Tunnel (External Access)
 
-Access Jellyfin securely at `https://your.domain.com`
+1. Go to Cloudflare Zero Trust dashboard → Networks → Tunnels → Create Tunnel
+2. Name it (e.g., `mollyflix`) and choose Docker as connector
+3. Copy the tunnel token and add to `.env` as `CLOUDFLARE_TUNNEL_TOKEN`
+4. Start container: `docker-compose up -d cloudflared`
+5. Configure public hostname:
+   - Subdomain: `jellyfin` (or `@` for root domain)
+   - Domain: `yourdomain.com`
+   - Service Type: `HTTP`
+   - URL: `http://jellyfin:8096`
+6. Optional: Disable IPv6 Happy Eyeballs in tunnel settings if experiencing DNS issues
+
+**Access Jellyfin externally at:** `https://jellyfin.yourdomain.com`
+
+### Gluetun VPN (qBittorrent Privacy)
+
+qBittorrent traffic is routed through Surfshark VPN using Gluetun container.
+
+**Verify VPN is working:**
+```bash
+# Check qBittorrent IP (should show VPN server IP)
+docker exec qbittorrent curl -s https://api.ipify.org
+
+# Check your host IP (should show your real IP)
+curl https://api.ipify.org
+```
+
+IPs should be different - qBittorrent uses VPN, your host uses direct connection.
 
 ## Final Steps
 
@@ -210,13 +234,11 @@ Access Jellyfin securely at `https://your.domain.com`
   
 - **Paths:** Always use the **right side** of volume mappings from docker-compose.yml (e.g., `/data/Movies`, `/data/TVShows`, `/data/Backup`). The left side is the host path, the right side is the container path.
 
-- **Caddy Custom Build:** First startup takes longer as it builds Caddy with Cloudflare and Dynamic DNS plugins
+- **qBittorrent VPN:** All qBittorrent traffic routes through Surfshark VPN. If VPN disconnects, qBittorrent stops working (kill switch). Configure qBittorrent WebUI in other containers using hostname `qbittorrent` and port `8080`.
 
 - **Environment Variables:** Never commit your `.env` file - it contains secrets. Add it to `.gitignore`.
 
 - **Port 1900 Conflict:** On Linux systems, the `rygel` DLNA service may conflict with Jellyfin. Remove it if needed: `sudo apt-get remove rygel`
-
-- **Readarr:** Removed as of July 23, 2025 - no longer supported by linuxserver
 
 ## Troubleshooting
 
@@ -229,10 +251,23 @@ Access Jellyfin securely at `https://your.domain.com`
 - Check if port 1900 is in use: `sudo netstat -tulpn | grep 1900`
 - Remove conflicting services (usually `rygel`)
 
-### Caddy not obtaining certificates
-- Verify Cloudflare API token is correct in `.env`
-- Check domain DNS is pointing to your server
-- Review Caddy logs: `docker-compose logs caddy`
+### qBittorrent not accessible
+- qBittorrent uses Gluetun's network stack
+- Access via `http://localhost:8080` (ports exposed through Gluetun container)
+- Check Gluetun VPN connection: `docker logs gluetun --tail 50`
+
+### VPN not working
+- Verify Surfshark credentials in `.env` file
+- Check VPN connection status: `docker exec qbittorrent curl -s https://api.ipify.org`
+- Should return VPN server IP, not your real IP
+- Review Gluetun logs: `docker-compose logs gluetun`
+
+### Cloudflare Tunnel not working
+- Verify tunnel token in `.env` is correct
+- Check tunnel status in Cloudflare Zero Trust dashboard
+- Ensure public hostname is configured correctly (Service: `http://jellyfin:8096`)
+- Review cloudflared logs: `docker-compose logs cloudflared`
+- If DNS resolution fails, try disabling IPv6 Happy Eyeballs in tunnel settings
 
 ## Useful Links
 - [Servarr Wiki](https://wiki.servarr.com/)
