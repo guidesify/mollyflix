@@ -3,7 +3,7 @@
 env
 
 # MollyFlix data directory - contains all media and config
-MollyFlix/
+# MollyFlix/
 
 # Service-specific directories
 Prowlarr/
@@ -13,7 +13,7 @@ Lidarr/
 Homarr/
 Jellyfin/
 qbittorrent/
-Caddy/
+Tdarr/
 
 # Downloads directory
 Downloads/

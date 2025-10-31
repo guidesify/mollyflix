@@ -181,6 +181,60 @@ volumes:
 ```
 Always use the path on the **right side** of the colon (e.g., `/data/Movies`)
 
+### Tdarr (Automated Transcoding)
+**Access:** `http://localhost:8265`
+
+Tdarr automatically transcodes your media files to H.265 (HEVC) format, reducing file sizes by 40-50% while maintaining similar quality. This saves significant disk space for your existing library.
+
+**Initial Setup:**
+
+1. **Access Web UI:**
+   - Navigate to `http://localhost:8265`
+   - Complete the initial setup wizard
+
+2. **Add Libraries:**
+   - Go to **Libraries** tab → **+ Library**
+   - **Movies Library:**
+     - Name: `Movies`
+     - Source: `/media/movies`
+     - Transcode cache: `/temp`
+     - Output folder: Leave **empty** (replaces original in same location)
+     - Folder watch scan: **On** (monitors for new files)
+     - Save
+   - **TV Shows Library:**
+     - Name: `TV Shows`
+     - Source: `/media/tvshows`
+     - Transcode cache: `/temp`
+     - Output folder: Leave **empty** (replaces original in same location)
+     - Folder watch scan: **On**
+     - Save
+
+3. **Configure Plugin Stack:**
+   - Go to **Libraries** tab → Select library → **Transcode options** → **Transcode**
+   - Add plugins in this order:
+     1. **Filter by Codec** - Configure to skip HEVC/H.265 files (already converted)
+     2. **Transcode: Custom FFmpeg/HandBrake Commands** - Set your H.265 encoding parameters
+   - Community plugins available at: https://github.com/HaveAGitGat/Tdarr_Plugins
+
+4. **Enable Workers:**
+   - Go to **Nodes** tab → Click **MainNode**
+   - Set **Transcode CPU:** `2` (start conservative, increase to 4 if system handles it well)
+   - Set **Health Check CPU:** `0` (optional, checks file integrity)
+   - Workers must be enabled or transcoding won't start
+
+5. **Run Library Scan:**
+   - Click **Scan** button on each library to populate file database
+   - Files matching your plugin stack criteria will enter transcode queue
+   - Transcoding begins automatically once workers are enabled
+
+**Workflow:**
+1. Download completes in qBittorrent
+2. Sonarr/Radarr moves file to media library
+3. Tdarr folder watch detects new file
+4. Plugin stack evaluates file (transcode if H.264, skip if already H.265)
+5. Original replaced with transcoded version
+6. Jellyfin serves optimized file to users
+
 ### Cloudflare Tunnel (External Access)
 
 1. Go to Cloudflare Zero Trust dashboard → Networks → Tunnels → Create Tunnel
@@ -269,6 +323,14 @@ IPs should be different - qBittorrent uses VPN, your host uses direct connection
 - Review cloudflared logs: `docker-compose logs cloudflared`
 - If DNS resolution fails, try disabling IPv6 Happy Eyeballs in tunnel settings
 
+### Tdarr not transcoding files
+- Verify libraries are added with correct paths (`/media/movies`, `/media/tvshows`)
+- Check plugin stack is configured in Library → Transcode options → Transcode tab
+- Run library scan manually to populate file database
+- Ensure folder watch is enabled for new file detection
+- Monitor logs: `docker-compose logs tdarr`
+- Verify node is connected: Check Nodes tab in web UI
+
 ## Useful Links
 - [Servarr Wiki](https://wiki.servarr.com/)
 - [Trash Guides](https://trash-guides.info/)
@@ -281,9 +343,10 @@ IPs should be different - qBittorrent uses VPN, your host uses direct connection
 Forked and enhanced from the original [automation-avenue/youtube-39-arr-apps-1-click](https://github.com/automation-avenue/youtube-39-arr-apps-1-click) repository.
 
 Enhancements in this fork:
-- Added Caddy reverse proxy with automatic HTTPS
-- Cloudflare DNS integration and dynamic DNS
-- Consolidated configuration with inline Dockerfile
+- Cloudflare Tunnel for external access (bypasses ISP port restrictions)
+- Gluetun VPN integration with Surfshark (qBittorrent-only routing)
+- Tdarr automated transcoding for space optimization (H.265 conversion)
+- Consolidated configuration with environment variables
 - Improved documentation with container networking guidance
 - Added comprehensive troubleshooting section
 

@@ -9,6 +9,9 @@ user-preferences:
   - No conversational closures
   - Terminal-only interface for task communication
   - Mobile network scenario (IP frequently changes when relocating)
+  - NEVER downgrade services without explicit permission
+  - User just restarted system (if NVENC still fails, research MX250 capabilities instead of requesting another restart)
+  - User just restarted system (if NVENC still fails, research MX250 capabilities instead of requesting another restart)
 
 style-avoidances:
   - No permission-seeking phrases
@@ -22,13 +25,15 @@ tool-priorities:
 
 project-constraints:
   - Project: mollyflix (Docker-based media server stack)
-  - Services: Prowlarr, Sonarr, Radarr, Lidarr, Homarr, Jellyfin, qBittorrent, Cloudflared, Gluetun
+  - Services: 11 containers (Prowlarr, Sonarr, Radarr, Lidarr, Homarr, Jellyfin, qBittorrent, Cloudflared, Gluetun, Tdarr, FlareSolverr)
   - Environment: Windows PowerShell, Docker Compose, Docker Desktop with WSL2
   - Config files use ${ARRPATH} environment variable
   - ARRPATH: ./MollyFlix/ (relative path for portability)
   - Domain: hundredpercent.win (Cloudflare DNS)
   - External access: Cloudflare Tunnel (jellyfin.hundredpercent.win)
-  - VPN: Gluetun + Surfshark (qBittorrent-only routing)
+  - VPN: Gluetun + Surfshark (qBittorrent routing)
+  - Transcoding: Tdarr (automated H.265 conversion for space savings, 1 worker CPU + 1 health check worker)
+  - FlareSolverr: Cloudflare bypass for Prowlarr indexers (port 8191)
   - Local IP: 192.168.68.73 (changes with location)
   - Public IP: 38.72.84.114 (changes with location)
   - VPN IP: 138.199.60.176 (Singapore server)
@@ -47,10 +52,18 @@ architecture-decisions:
     - Verification: qBittorrent IP 138.199.60.176 (VPN), host IP 38.72.84.114 (direct)
     - Kill Switch: qBittorrent stops working if VPN disconnects
   
+  - Hardware Transcoding (NVIDIA):
+    - GPU: NVIDIA GeForce MX250 (2GB VRAM, Pascal GP108, Compute Capability 6.1)
+    - NVENC Support: **NONE - GP108 has 0 NVENC encoders (verified via Wikipedia NVENC matrix)**
+    - CPU: Intel Core i7-10510U (10th gen Comet Lake) with Intel UHD Graphics
+    - Intel Quick Sync: Available in hardware but **NOT accessible in Docker Desktop Windows/WSL2**
+    - Limitation: Docker Desktop on Windows doesn't support /dev/dri passthrough for Intel QSV
+    - Status: No hardware transcoding available, CPU software transcoding only (H.264/HEVC via libx264/libx265)
+  
   - Performance Optimizations:
     - Cloudflare Tunnel protocol: QUIC → HTTP/2 (resolved streaming timeouts, 430ms → 44ms latency)
     - DNS resolution: Disabled IPv6 Happy Eyeballs (resolved hostname resolution failures on IPv4-only systems)
-    - Video stuttering: Deferred investigation (likely Jellyfin transcoding/bandwidth related)
+    - Video stuttering: Hardware transcoding enabled to reduce CPU load and improve performance
 
 critical-troubleshooting:
   - Windows Networking Issues:
@@ -76,6 +89,7 @@ configuration-files:
     - Services: 9 containers (Prowlarr, Sonarr, Radarr, Lidarr, Homarr, Jellyfin, qBittorrent, Cloudflared, Gluetun)
     - Gluetun: cap_add NET_ADMIN, devices /dev/net/tun, ports 8080/6881 forwarding
     - qBittorrent: network_mode: service:gluetun (routes all traffic through VPN)
+    - Jellyfin: No GPU runtime (MX250 has no NVENC, Intel QSV not supported in Docker Desktop Windows)
     - Cloudflared: --protocol http2 flag for stability
   
   - README.md:
@@ -84,6 +98,7 @@ configuration-files:
     - Removed: Caddy-specific documentation, Windows port binding fixes (no longer relevant)
 
 pending-tasks:
-  - Video stuttering investigation (Jellyfin transcoding/Cloudflare Tunnel bandwidth)
-  - Consider hardware transcoding enablement (Intel Quick Sync, NVIDIA NVENC)
+  - Monitor Tdarr transcoding progress (17hrs per movie with current i7-10510U CPU encoding)
+  - Consider increasing workers to 2 CPU if transcoding takes too long (monitor system responsiveness)
+  - Monitor disk space savings as transcoding completes
   - Monitor Cloudflare Tunnel bandwidth limits (free tier)
