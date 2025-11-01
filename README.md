@@ -184,56 +184,37 @@ Always use the path on the **right side** of the colon (e.g., `/data/Movies`)
 ### Tdarr (Automated Transcoding)
 **Access:** `http://localhost:8265`
 
-Tdarr automatically transcodes your media files to H.265 (HEVC) format, reducing file sizes by 40-50% while maintaining similar quality. This saves significant disk space for your existing library.
+Tdarr automatically transcodes your media files to H.265 (HEVC) format, reducing file sizes by 40-60% while maintaining quality. Transcoding occurs **after** Radarr/Sonarr import files to the library.
 
 **Initial Setup:**
 
-1. **Access Web UI:**
-   - Navigate to `http://localhost:8265`
-   - Complete the initial setup wizard
+1. **Libraries:**
+   - Add **Movies** library: Source `/media/movies`, Cache `/temp`
+   - Add **TV Shows** library: Source `/media/tvshows`, Cache `/temp`
+   - Leave output folder **empty** (replaces originals in place)
+   - Enable **Folder watch scan** for both libraries
 
-2. **Add Libraries:**
-   - Go to **Libraries** tab → **+ Library**
-   - **Movies Library:**
-     - Name: `Movies`
-     - Source: `/media/movies`
-     - Transcode cache: `/temp`
-     - Output folder: Leave **empty** (replaces original in same location)
-     - Folder watch scan: **On** (monitors for new files)
-     - Save
-   - **TV Shows Library:**
-     - Name: `TV Shows`
-     - Source: `/media/tvshows`
-     - Transcode cache: `/temp`
-     - Output folder: Leave **empty** (replaces original in same location)
-     - Folder watch scan: **On**
-     - Save
+2. **Configure Flow (CRITICAL STEP):**
+   - **Flows** tab → Create new flow or edit existing
+   - Add your H.265 encoding plugins (community plugins: https://github.com/HaveAGitGat/Tdarr_Plugins)
+   - **Last step:** Add custom notification plugin:
+     - Click "+" to add new plugin
+     - Search for "Notify Radarr/Sonarr"
+     - Select "Notify Radarr/Sonarr after transcode"
+     - This automatically notifies Radarr/Sonarr and cleans up Downloads folder
+   - Save flow
 
-3. **Configure Plugin Stack:**
-   - Go to **Libraries** tab → Select library → **Transcode options** → **Transcode**
-   - Add plugins in this order:
-     1. **Filter by Codec** - Configure to skip HEVC/H.265 files (already converted)
-     2. **Transcode: Custom FFmpeg/HandBrake Commands** - Set your H.265 encoding parameters
-   - Community plugins available at: https://github.com/HaveAGitGat/Tdarr_Plugins
-
-4. **Enable Workers:**
-   - Go to **Nodes** tab → Click **MainNode**
-   - Set **Transcode CPU:** `2` (start conservative, increase to 4 if system handles it well)
-   - Set **Health Check CPU:** `0` (optional, checks file integrity)
-   - Workers must be enabled or transcoding won't start
-
-5. **Run Library Scan:**
-   - Click **Scan** button on each library to populate file database
-   - Files matching your plugin stack criteria will enter transcode queue
-   - Transcoding begins automatically once workers are enabled
+3. **Enable Workers:**
+   - **Nodes** tab → MainNode → Set **Transcode CPU: 2** (adjust based on system performance)
 
 **Workflow:**
-1. Download completes in qBittorrent
-2. Sonarr/Radarr moves file to media library
-3. Tdarr folder watch detects new file
-4. Plugin stack evaluates file (transcode if H.264, skip if already H.265)
-5. Original replaced with transcoded version
-6. Jellyfin serves optimized file to users
+1. qBittorrent downloads file → Radarr/Sonarr imports to library
+2. Tdarr detects new file → Transcodes H.264 → H.265
+3. Execute plugin runs notification script → Updates Radarr/Sonarr immediately
+4. Script deletes original download folder to prevent duplication
+5. Jellyfin serves optimized file
+
+**Performance:** ~17 hours per movie on Intel i7-10510U (CPU-only encoding, no GPU acceleration available)
 
 ### Cloudflare Tunnel (External Access)
 
@@ -325,11 +306,22 @@ IPs should be different - qBittorrent uses VPN, your host uses direct connection
 
 ### Tdarr not transcoding files
 - Verify libraries are added with correct paths (`/media/movies`, `/media/tvshows`)
-- Check plugin stack is configured in Library → Transcode options → Transcode tab
+- Check Flow is configured with transcode plugins
 - Run library scan manually to populate file database
 - Ensure folder watch is enabled for new file detection
+- Verify node workers are enabled: Nodes tab → MainNode → Set CPU workers > 0
 - Monitor logs: `docker-compose logs tdarr`
-- Verify node is connected: Check Nodes tab in web UI
+
+### Radarr/Sonarr not detecting transcoded files
+- Verify Tdarr Flow includes Execute plugin calling `/scripts/notify-arr.sh` as final step
+- Test notification script: `docker exec tdarr /scripts/notify-arr.sh "/media/movies/Test/test.mkv"`
+- Without notification setup, Radarr/Sonarr only scan every 24 hours
+- See `TDARR_NOTIFICATION_SETUP.md` for configuration details
+
+### Transcoded files have dropped frames
+- Add `-vsync cfr` to Tdarr's FFmpeg encoding parameters
+- Ensure framerate mode is set to "Constant" not "Variable"
+- Match output framerate to source: `-r {{{args.inputFPS}}}`
 
 ## Useful Links
 - [Servarr Wiki](https://wiki.servarr.com/)

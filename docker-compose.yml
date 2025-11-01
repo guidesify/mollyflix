@@ -146,6 +146,7 @@ services:
       - ${ARRPATH}Tdarr/server:/app/server
       - ${ARRPATH}Tdarr/configs:/app/configs
       - ${ARRPATH}Tdarr/logs:/app/logs
+      - ${ARRPATH}Tdarr/scripts:/scripts
       - ${ARRPATH}Radarr/movies:/media/movies
       - ${ARRPATH}Sonarr/tvshows:/media/tvshows
       - ${ARRPATH}Downloads:/temp
@@ -158,6 +159,8 @@ services:
       - webUIPort=8265
       - internalNode=true
       - nodeName=MainNode
+      - RADARR_API_KEY=d1970c0be668458b88c24cbf3c5d540c
+      - SONARR_API_KEY=0620b4cea2404ef5bba11d42069f1051
     env_file:
       - '.env'
     restart: unless-stopped
