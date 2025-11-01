@@ -11,6 +11,8 @@ applyTo: "*"
   - OPENVPN_PROVIDER=surfshark
   - OPENVPN_USERNAME, OPENVPN_PASSWORD
   - SERVER_COUNTRIES=Singapore
+  - QBITTORRENT_USER, QBITTORRENT_PASSWORD (for API authentication in notify-arr.sh)
+  - JELLYFIN_API_KEY (for library refresh after transcode)
 
 ## docker-compose.yml
 - **Services:** 11 containers (Prowlarr, Sonarr, Radarr, Lidarr, Homarr, Jellyfin, qBittorrent, Cloudflared x5, Gluetun, Tdarr, FlareSolverr)

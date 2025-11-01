@@ -42,6 +42,13 @@ OPENVPN_PROVIDER=surfshark
 OPENVPN_USERNAME=your_surfshark_username
 OPENVPN_PASSWORD=your_surfshark_password
 SERVER_COUNTRIES=Singapore
+
+# qBittorrent Credentials (set after initial login)
+QBITTORRENT_USER=admin
+QBITTORRENT_PASSWORD=your_qbittorrent_password
+
+# Jellyfin API Key (get from Jellyfin dashboard → Settings → API Keys)
+JELLYFIN_API_KEY=your_jellyfin_api_key
 ```
 
 3. Start the stack:
